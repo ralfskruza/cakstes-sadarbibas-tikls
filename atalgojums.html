@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="lv">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Amatpersonu atalgojums</title>
+  <!-- PapaParse for robust CSV parsing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <style>
+    :root {
+      --primary-color: #1e293b;
+      --text-muted: #64748b;
+      --border-color: #e2e8f0;
+      --table-header-bg: #f8fafc;
+      --table-row-hover: #f1f5f9;
+      --accent-color: #0284c7;
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-family);
+      background-color: transparent;
+      color: var(--primary-color);
+      padding: 16px;
+      line-height: 1.5;
+    }
+
+    .table-container {
+      max-width: 960px;
+      margin: 0 auto;
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+      overflow: hidden;
+    }
+
+    .table-header-panel {
+      padding: 20px 24px;
+      background: #ffffff;
+      border-bottom: 2px solid var(--border-color);
+      text-align: center;
+    }
+
+    .legal-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #0f172a;
+      margin-bottom: 6px;
+    }
+
+    .period-badge {
+      display: inline-block;
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: #334155;
+      background: #f1f5f9;
+      padding: 4px 14px;
+      border-radius: 9999px;
+      margin-top: 4px;
+    }
+
+    .table-responsive {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.95rem;
+    }
+
+    thead th {
+      background-color: var(--table-header-bg);
+      color: #475569;
+      font-weight: 600;
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border-color);
+      white-space: nowrap;
+    }
+
+    thead th:first-child {
+      width: 70px;
+      text-align: center;
+    }
+
+    thead th:last-child {
+      text-align: right;
+    }
+
+    tbody td {
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border-color);
+      color: #334155;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    tbody tr:hover {
+      background-color: var(--table-row-hover);
+    }
+
+    tbody td:first-child {
+      text-align: center;
+      font-weight: 600;
+      color: #64748b;
+    }
+
+    tbody td:last-child {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    .table-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 24px;
+      background: #fafafa;
+      border-top: 1px solid var(--border-color);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: #22c55e;
+      display: inline-block;
+    }
+
+    .status-dot.loading {
+      background-color: #eab308;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    /* Print styles */
+    @media print {
+      body {
+        padding: 0;
+        background: white;
+      }
+      .table-container {
+        box-shadow: none;
+        border: 1px solid #000;
+        border-radius: 0;
+      }
+      table, th, td {
+        border: 1px solid #000 !important;
+      }
+      thead th {
+        background-color: #f0f0f0 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .table-footer {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="table-container">
+    <div class="table-header-panel">
+      <div id="legal-title" class="legal-title">Saskaņā ar likumu "Grozījumi Valsts pārvaldes iekārtas likumā"</div>
+      <div id="period-badge" class="period-badge">Aprīlis, 2026. gads</div>
+    </div>
+
+    <div class="table-responsive">
+      <table id="data-table">
+        <thead>
+          <tr id="table-head-row">
+            <th>N.p.k.</th>
+            <th>Amata nosaukums</th>
+            <th>Vārds, uzvārds</th>
+            <th>Aprēķinātais atalgojums (ar nodokļiem)</th>
+          </tr>
+        </thead>
+        <tbody id="table-body">
+          <!-- Rindas tiek ielādētas dinamiski -->
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-footer">
+      <span class="status-badge">
+        <span id="status-dot" class="status-dot"></span>
+        <span id="status-text">Savienots ar Google Sheets</span>
+      </span>
+      <span id="last-updated">Atjaunots: šodien</span>
+    </div>
+  </div>
+
+  <script>
+    // Konfigurācija
+    const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSVxheZ723PTu4hQ0appbIlnTNu_uUnCET2u_TSl_kZnNp5SCyjsEqaq3_vur1mgQVJI5zhy-JD-WoT/pub?gid=972459896&single=true&output=csv";
+
+    // Rezerves dati (ja Google Sheets cilne ir tukša vai notiek ielādes kļūda)
+    const FALLBACK_DATA = {
+      legalTitle: 'Saskaņā ar likumu "Grozījumi Valsts pārvaldes iekārtas likumā"',
+      period: "Aprīlis, 2026. gads",
+      headers: ["N.p.k.", "Amata nosaukums", "Vārds, uzvārds", "Aprēķinātais atalgojums (ar nodokļiem)"],
+      rows: [
+        ["1", "Vadītājs/direktors", "L. Katkeviča", "1929"],
+        ["2", "direktora vietnieks", "I. Leitāne", "2590"],
+        ["3", "direktora vietnieks", "R. Zauka", "2590"],
+        ["4", "direktora vietnieks", "S. Veita", "2590"],
+        ["5", "direktora vietnieks", "A. Dambergs", "2590"],
+        ["6", "direktora vietnieks", "K. Sila", "192.90"]
+      ]
+    };
+
+    /**
+     * Formatē naudas summu eiro valūtā
+     */
+    function formatCurrency(val) {
+      if (!val) return "";
+      let str = String(val).trim().replace(/\s/g, '').replace(',', '.').replace('€', '');
+      let num = parseFloat(str);
+      if (isNaN(num)) return val;
+      return new Intl.NumberFormat('lv-LV', {
+        style: 'currency',
+        currency: 'EUR',
+        minimumFractionDigits: num % 1 === 0 ? 0 : 2,
+        maximumFractionDigits: 2
+      }).format(num);
+    }
+
+    /**
+     * Atveido tabulas saturu DOM
+     */
+    function renderTable(data) {
+      if (data.legalTitle) {
+        document.getElementById('legal-title').textContent = data.legalTitle;
+      }
+      if (data.period) {
+        document.getElementById('period-badge').textContent = data.period;
+      }
+
+      // Galvene
+      const theadRow = document.getElementById('table-head-row');
+      theadRow.innerHTML = '';
+      data.headers.forEach((h, index) => {
+        const th = document.createElement('th');
+        th.textContent = h;
+        theadRow.appendChild(th);
+      });
+
+      // Datu rindas
+      const tbody = document.getElementById('table-body');
+      tbody.innerHTML = '';
+
+      data.rows.forEach(row => {
+        if (!row || row.length === 0 || row.every(c => !c || !c.trim())) return;
+        const tr = document.createElement('tr');
+        
+        row.forEach((cell, idx) => {
+          const td = document.createElement('td');
+          // Ja pēdējā kolonna (atalgojums), noformatējam kā valūtu
+          if (idx === row.length - 1) {
+            td.textContent = formatCurrency(cell);
+          } else {
+            td.textContent = cell || '';
+          }
+          tr.appendChild(td);
+        });
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    /**
+     * Apstrādā CSV matricas datus, ņemot vērā iespējamās apvienotās galvenes rindas
+     */
+    function parseCSVData(rows) {
+      // Filtrējam pilnīgi tukšas rindas
+      const cleanRows = rows.filter(r => r && r.some(cell => cell && String(cell).trim() !== ""));
+      if (cleanRows.length === 0) return null;
+
+      let legalTitle = null;
+      let period = null;
+      let headers = null;
+      let dataRows = [];
+
+      let rowIndex = 0;
+
+      // Pārbaudām, vai 1. rinda ir juridisks teksts
+      const firstCell = String(cleanRows[0][0] || '').trim();
+      const hasHeaderKeywords = firstCell.toLowerCase().includes("n.p.k") || firstCell.toLowerCase().includes("amats");
+
+      if (!hasHeaderKeywords) {
+        // 1. rinda ir likuma atsauce
+        legalTitle = firstCell;
+        rowIndex++;
+
+        // 2. rinda varētu būt periods/mēnesis
+        if (cleanRows[rowIndex]) {
+          const secondRowCell = String(cleanRows[rowIndex][0] || '').trim();
+          const secondHasKeywords = secondRowCell.toLowerCase().includes("n.p.k") || secondRowCell.toLowerCase().includes("amats");
+          if (!secondHasKeywords) {
+            period = secondRowCell;
+            rowIndex++;
+          }
+        }
+      }
+
+      // Nākamā rinda ir kolonnu galvenes
+      if (cleanRows[rowIndex]) {
+        headers = cleanRows[rowIndex].map(c => String(c || '').trim()).filter(c => c !== "");
+        rowIndex++;
+      }
+
+      // Pārējās rindas ir dati
+      for (let i = rowIndex; i < cleanRows.length; i++) {
+        const row = cleanRows[i].map(c => String(c || '').trim());
+        // Ņemam tikai rindas ar datiem
+        if (row.some(c => c !== "")) {
+          dataRows.push(row);
+        }
+      }
+
+      return {
+        legalTitle: legalTitle || FALLBACK_DATA.legalTitle,
+        period: period || FALLBACK_DATA.period,
+        headers: headers && headers.length ? headers : FALLBACK_DATA.headers,
+        rows: dataRows.length ? dataRows : FALLBACK_DATA.rows
+      };
+    }
+
+    /**
+     * Ielādē datus no Google Sheets ar kešatmiņas apiešanu
+     */
+    async function loadData() {
+      const statusDot = document.getElementById('status-dot');
+      const statusText = document.getElementById('status-text');
+      const lastUpdated = document.getElementById('last-updated');
+
+      statusDot.className = 'status-dot loading';
+      statusText.textContent = 'Ielādē datus...';
+
+      const freshUrl = CSV_URL + (CSV_URL.includes("?") ? "&" : "?") + "_cacheBust=" + Date.now();
+
+      try {
+        const response = await fetch(freshUrl);
+        if (!response.ok) throw new Error("Tīkla kļūda: " + response.status);
+
+        const csvText = await response.text();
+        if (!csvText || csvText.trim().length === 0) {
+          throw new Error("Google Sheets lapa ir tukša");
+        }
+
+        // Parsēšana ar PapaParse
+        const parsed = Papa.parse(csvText, {
+          skipEmptyLines: true
+        });
+
+        const structured = parseCSVData(parsed.data);
+        if (!structured || structured.rows.length === 0) {
+          throw new Error("Nav derīgu datu");
+        }
+
+        renderTable(structured);
+        statusDot.className = 'status-dot';
+        statusText.textContent = 'Dati sinhronizēti no Google Sheets';
+        lastUpdated.textContent = 'Atjaunots: ' + new Date().toLocaleTimeString('lv-LV', { hour: '2-digit', minute: '2-digit' });
+      } catch (err) {
+        console.warn("Ielāde neizdevās, izmantojam noklusējuma datus:", err);
+        renderTable(FALLBACK_DATA);
+        statusDot.className = 'status-dot';
+        statusDot.style.backgroundColor = '#64748b';
+        statusText.textContent = 'Parauga dati (gaida Google Sheets aizpildi)';
+        lastUpdated.textContent = 'Pārbaudīts: ' + new Date().toLocaleTimeString('lv-LV', { hour: '2-digit', minute: '2-digit' });
+      }
+    }
+
+    // Inicializācija
+    document.addEventListener("DOMContentLoaded", loadData);
+  </script>
+</body>
+</html>
