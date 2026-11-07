@@ -25,8 +25,9 @@
       font-family: var(--font-family);
       color: var(--color-gold);
       margin: 0;
-      padding: 12px 16px;
-      line-height: 1.6;
+      padding: 6px 12px;
+      line-height: 1.5;
+      overflow: hidden;
       -webkit-font-smoothing: antialiased;
     }
 
@@ -177,6 +178,16 @@
 
         tbody.appendChild(tr);
       });
+
+      // Paziņo vecāka lapai (ja ievietots ar iframe) par precīzo augstumu
+      setTimeout(notifyHeight, 50);
+    }
+
+    function notifyHeight() {
+      try {
+        const height = Math.ceil(document.documentElement.scrollHeight || document.body.scrollHeight || 300);
+        window.parent.postMessage({ type: 'cakstes-atalgojums-height', height: height }, '*');
+      } catch (e) {}
     }
 
     /**
