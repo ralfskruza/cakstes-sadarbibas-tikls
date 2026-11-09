@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="lv">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ātrās saites</title>
+  <style>
+    :root {
+      /* Galvenie izmēru un atstarpju iestatījumi */
+      --logo-height: 52px;          /* Logo attēla maksimālais augstums */
+      --logo-max-width: 170px;      /* Logo attēla maksimālais platums */
+      --card-padding-y: 10px;       /* Kartītes vertikālā iekšējā atstarpe */
+      --card-padding-x: 20px;       /* Kartītes horizontālā iekšējā atstarpe */
+      --card-border-radius: 12px;   /* Kartītes stūru noapaļojums */
+      --gap: 16px;                  /* Atstarpe starp kartītēm */
+      --card-bg: #FFFFFF;           /* Kartītes baltais fons */
+      --card-border: rgba(0, 0, 0, 0.08); /* Maiga kartītes apmale */
+      --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.05); /* Pamatnes ēna */
+      --card-shadow-hover: 0 8px 20px rgba(0, 0, 0, 0.12); /* Ēna uzbīdot kursoru */
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      background: transparent !important;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 8px 12px;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Galvenais konteiners */
+    .quick-links-container {
+      width: 100%;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      gap: var(--gap);
+      opacity: 0;
+      transition: opacity 0.25s ease-in-out;
+    }
+
+    .quick-links-container.is-ready {
+      opacity: 1;
+    }
+
+    /* Atsevišķa logo kartīte ar hipersaiti */
+    .quick-link-item {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--card-border-radius);
+      padding: var(--card-padding-y) var(--card-padding-x);
+      box-shadow: var(--card-shadow);
+      text-decoration: none;
+      transition: transform 0.2s cubic-bezier(0.2, 0, 0.2, 1), 
+                  box-shadow 0.2s cubic-bezier(0.2, 0, 0.2, 1),
+                  border-color 0.2s ease;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Viegls un elegants hover efekts */
+    .quick-link-item:hover,
+    .quick-link-item:focus-visible {
+      transform: translateY(-3px) scale(1.02);
+      box-shadow: var(--card-shadow-hover);
+      border-color: rgba(0, 0, 0, 0.16);
+      outline: none;
+    }
+
+    .quick-link-item:active {
+      transform: translateY(-1px) scale(1.0);
+    }
+
+    /* Logo attēls */
+    .quick-link-logo {
+      display: block;
+      height: var(--logo-height);
+      max-width: var(--logo-max-width);
+      width: auto;
+      object-fit: contain;
+      user-select: none;
+      -webkit-user-drag: none;
+      pointer-events: none;
+    }
+
+    /* Mobilajām ierīcēm un šauriem ekrāniem */
+    @media (max-width: 640px) {
+      :root {
+        --logo-height: 42px;
+        --logo-max-width: 130px;
+        --card-padding-y: 8px;
+        --card-padding-x: 14px;
+        --gap: 12px;
+      }
+      body {
+        padding: 6px 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Konteiners, kurā dinamiski tiek ģenerēti logo -->
+  <div id="quick-links" class="quick-links-container" role="navigation" aria-label="Ātrās saites"></div>
+
+  <script>
+    /* ==========================================================================
+       1. PARAMETRI UN KONFIGURĀCIJA (MAINI ŠEIT)
+       ========================================================================== */
+    const CONFIG = {
+      // 1. Google Sheets publicētā CSV saite:
+      sheetCsvUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSVxheZ723PTu4hQ0appbIlnTNu_uUnCET2u_TSl_kZnNp5SCyjsEqaq3_vur1mgQVJI5zhy-JD-WoT/pub?gid=2099613997&single=true&output=csv",
+
+      // 2. Kešošanas laiks minūtēs (lai lapa ielādētos acumirklī un nenoslogotu tīklu):
+      cacheMinutes: 5,
+
+      // 3. Rezerves dati (ja internets/Google Sheets kādu brīdi nav sasniedzams):
+      fallbackData: [
+        {
+          nosaukums: "eKLASE",
+          logo_url: "https://www.eklase.lv/Content/Images/logo.svg",
+          saite: "https://www.eklase.lv/",
+          seciba: 1,
+          aktivs: "JĀ"
+        },
+        {
+          nosaukums: "Erasmus+",
+          logo_url: "https://erasmus-plus.ec.europa.eu/themes/custom/erasmus/logo.svg",
+          saite: "https://erasmus-plus.ec.europa.eu/",
+          seciba: 2,
+          aktivs: "JĀ"
+        },
+        {
+          nosaukums: "Liepāja",
+          logo_url: "https://www.liepaja.lv/app/themes/liepaja/dist/images/liepaja-logo.svg",
+          saite: "https://www.liepaja.lv/",
+          seciba: 3,
+          aktivs: "JĀ"
+        }
+      ]
+    };
+
+    /* ==========================================================================
+       2. TĪRS JAVASCRIPT CSV PARSERIS (BEZ ĀRĒJĀM BIBLIOTĒKĀM)
+       Korekti apstrādā pēdiņas, komatus tekstā un dažādus rindu pārnesumus.
+       ========================================================================== */
+    function parseCSV(text) {
+      const rows = [];
+      let currentRow = [];
+      let currentVal = '';
+      let insideQuote = false;
+
+      // Normalizē rindu atdalītājus
+      const cleanText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+      for (let i = 0; i < cleanText.length; i++) {
+        const char = cleanText[i];
+        const nextChar = cleanText[i + 1];
+
+        if (char === '"') {
+          if (insideQuote && nextChar === '"') {
+            currentVal += '"';
+            i++; // Izlaiž dubultās pēdiņas
+          } else {
+            insideQuote = !insideQuote;
+          }
+        } else if (char === ',' && !insideQuote) {
+          currentRow.push(currentVal.trim());
+          currentVal = '';
+        } else if (char === '\n' && !insideQuote) {
+          currentRow.push(currentVal.trim());
+          if (currentRow.some(c => c !== '')) {
+            rows.push(currentRow);
+          }
+          currentRow = [];
+          currentVal = '';
+        } else {
+          currentVal += char;
+        }
+      }
+
+      if (currentVal || currentRow.length > 0) {
+        currentRow.push(currentVal.trim());
+        if (currentRow.some(c => c !== '')) {
+          rows.push(currentRow);
+        }
+      }
+
+      return rows;
+    }
+
+    /* ==========================================================================
+       3. DATU APSTRĀDE UN PĀRVEIDOŠANA
+       ========================================================================== */
+    function processCsvData(rows) {
+      if (!rows || rows.length < 2) return [];
+
+      // Pirmā rinda ir virsraksti
+      const headers = rows[0].map(h => String(h || '').toLowerCase().trim());
+      
+      const colIndex = {
+        nosaukums: headers.findIndex(h => h.includes('nosaukum') || h === 'title' || h === 'name'),
+        logo_url: headers.findIndex(h => h.includes('logo') || h.includes('attels') || h.includes('attēls') || h.includes('img')),
+        saite: headers.findIndex(h => (h.includes('sait') || h === 'url' || h === 'link' || h.includes('href')) && !h.includes('logo')),
+        seciba: headers.findIndex(h => h.includes('secīb') || h.includes('secib') || h.includes('order') || h.includes('sort')),
+        aktivs: headers.findIndex(h => h.includes('aktīv') || h.includes('aktiv') || h.includes('status') || h.includes('active'))
+      };
+
+      const result = [];
+
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || row.length === 0) continue;
+
+        const getCell = (idx) => (idx !== -1 && row[idx] !== undefined) ? String(row[idx]).trim() : '';
+
+        const nosaukums = getCell(colIndex.nosaukums);
+        const logo_url = getCell(colIndex.logo_url);
+        const saite = getCell(colIndex.saite);
+        const secibaStr = getCell(colIndex.seciba);
+        const aktivsStr = getCell(colIndex.aktivs).toUpperCase();
+
+        // Pārbauda aktīvā statusu (JĀ / JA / YES / TRUE / 1)
+        const isAktivs = (aktivsStr === 'JĀ' || aktivsStr === 'JA' || aktivsStr === 'YES' || aktivsStr === 'TRUE' || aktivsStr === '1');
+
+        if (!isAktivs) continue;
+        if (!logo_url || !saite) continue; // Nepieciešams vismaz logo un saite
+
+        const seciba = parseInt(secibaStr, 10);
+
+        result.push({
+          nosaukums: nosaukums || 'Saite',
+          logo_url: logo_url,
+          saite: saite,
+          seciba: isNaN(seciba) ? 9999 : seciba
+        });
+      }
+
+      // Kārto pēc secības (mazākais pirmais)
+      result.sort((a, b) => a.seciba - b.seciba);
+      return result;
+    }
+
+    /* ==========================================================================
+       4. LOGO KARTĪŠU ATTĒLOŠANA (DOM RENDER)
+       ========================================================================== */
+    function renderLinks(items) {
+      const container = document.getElementById('quick-links');
+      if (!items || items.length === 0) {
+        container.innerHTML = '';
+        container.classList.remove('is-ready');
+        notifyParentHeight();
+        return;
+      }
+
+      // Izveido elementus
+      const fragment = document.createDocumentFragment();
+
+      items.forEach(item => {
+        const a = document.createElement('a');
+        a.className = 'quick-link-item';
+        a.href = item.saite;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.setAttribute('aria-label', item.nosaukums);
+        a.setAttribute('title', item.nosaukums);
+
+        const img = document.createElement('img');
+        img.className = 'quick-link-logo';
+        img.src = item.logo_url;
+        img.alt = item.nosaukums;
+        img.loading = 'lazy';
+
+        // Ja attēlu neizdodas ielādēt, paslēpj šo kartīti nevis rāda salauztu ikonu
+        img.onerror = function() {
+          a.style.display = 'none';
+          notifyParentHeight();
+        };
+
+        a.appendChild(img);
+        fragment.appendChild(a);
+      });
+
+      container.innerHTML = '';
+      container.appendChild(fragment);
+      container.classList.add('is-ready');
+
+      // Paziņo iframe vecākam par jaunajiem augstuma izmēriem
+      setTimeout(notifyParentHeight, 50);
+      setTimeout(notifyParentHeight, 300); // Papildus pārbaude pēc attēlu ielādes
+    }
+
+    /* ==========================================================================
+       5. IFRAME AUTOMĀTISKĀ AUGSTUMA ZIŅOŠANA (postMessage)
+       ========================================================================== */
+    function notifyParentHeight() {
+      try {
+        const height = Math.ceil(document.documentElement.scrollHeight || document.body.scrollHeight || 100);
+        window.parent.postMessage({ type: 'cakstes-atro-saites-height', height: height }, '*');
+      } catch (e) {}
+    }
+
+    window.addEventListener('resize', notifyParentHeight);
+
+    /* ==========================================================================
+       6. KEŠOŠANA UN DATU IELĀDE (LOCALSTORAGE)
+       ========================================================================== */
+    const CACHE_KEY_DATA = 'cakstes_quicklinks_data';
+    const CACHE_KEY_TIME = 'cakstes_quicklinks_time';
+
+    async function loadData() {
+      const now = Date.now();
+      const cachedData = localStorage.getItem(CACHE_KEY_DATA);
+      const cachedTime = localStorage.getItem(CACHE_KEY_TIME);
+      const cacheExpiryMs = CONFIG.cacheMinutes * 60 * 1000;
+
+      // 1. Ja kešatmiņā ir dati un tie ir svaigi, parādām uzreiz
+      if (cachedData && cachedTime && (now - parseInt(cachedTime, 10) < cacheExpiryMs)) {
+        try {
+          const parsed = JSON.parse(cachedData);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            renderLinks(parsed);
+            return;
+          }
+        } catch (e) {
+          // Ja kešs bojāts, turpinām ar tīkla pieprasījumu
+        }
+      }
+
+      // 2. Ja ir noklusējuma URL vietā atstāts vietturis (placeholder), izmantojam fallbackData
+      if (!CONFIG.sheetCsvUrl || CONFIG.sheetCsvUrl.includes('placeholder_REPLACE')) {
+        renderLinks(CONFIG.fallbackData);
+        return;
+      }
+
+      // 3. Ielādējam datus no Google Sheets CSV
+      try {
+        // Pievieno laika zīmogu pret pārlūka agresīvo HTTP kešošanu
+        const fetchUrl = CONFIG.sheetCsvUrl + (CONFIG.sheetCsvUrl.includes('?') ? '&' : '?') + '_ts=' + now;
+        const response = await fetch(fetchUrl);
+
+        if (!response.ok) {
+          throw new Error('Tīkla kļūda: ' + response.status);
+        }
+
+        const csvText = await response.text();
+        const rows = parseCSV(csvText);
+        const links = processCsvData(rows);
+
+        if (links && links.length > 0) {
+          // Saglabājam svaigos datus kešā
+          localStorage.setItem(CACHE_KEY_DATA, JSON.stringify(links));
+          localStorage.setItem(CACHE_KEY_TIME, now.toString());
+          renderLinks(links);
+        } else {
+          // Ja tabula tukša vai nav aktīvu saišu
+          renderLinks(CONFIG.fallbackData);
+        }
+      } catch (err) {
+        console.warn('Google Sheets datu ielāde neizdevās, izmantojam rezerves variantu.', err);
+        // Ja ir saglabāts vecs kešs, lietojam to; citādi fallbackData
+        if (cachedData) {
+          try {
+            renderLinks(JSON.parse(cachedData));
+            return;
+          } catch (e) {}
+        }
+        renderLinks(CONFIG.fallbackData);
+      }
+    }
+
+    // Inicializācija lapas ielādē
+    document.addEventListener('DOMContentLoaded', loadData);
+  </script>
+</body>
+</html>
